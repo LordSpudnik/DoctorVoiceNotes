@@ -28,3 +28,6 @@ models/**/*.txt
 build/
 dist/
 *.spec.bak
+
+# Test artifacts
+tests/
