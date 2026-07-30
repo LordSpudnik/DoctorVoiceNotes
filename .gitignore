@@ -1,8 +1,9 @@
 # Python
 __pycache__/
 *.pyc
-venv/
+.venv/
 *.egg-info/
+.vscode/
 
 # Logs - may contain diagnostic detail, keep out of version control
 logs/*.log
@@ -18,7 +19,11 @@ notes/*.docx
 models/**/*.bin
 models/**/*.json
 models/**/*.txt
+models/**/*.TAG
 !models/small.en/README_DOWNLOAD_MODEL.txt
+.locks/
+models--Systran--faster-whisper-small.en/
+
 
 # Local settings (keep the template in config/, but ignore any doctor-
 # specific overrides if you choose to rename them locally)
@@ -31,3 +36,4 @@ dist/
 
 # Test artifacts
 tests/
+test_notes/

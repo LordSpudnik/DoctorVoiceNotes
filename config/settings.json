@@ -1,23 +1,15 @@
 {
-  "_comment": "Default settings for Doctor Voice Notes. Safe to hand-edit while the app is closed. If the app is open, use the Settings screen instead so your edits are not overwritten on exit.",
-
-  "default_save_folder": "notes",
+  "default_save_folder": "test_notes",
   "default_document_name": "PatientNotes.docx",
-
   "selected_microphone": null,
-
   "autosave_interval_seconds": 5,
-
   "theme": "light",
   "large_text_mode": false,
   "font_size": 18,
-
   "voice_commands_enabled": true,
-
   "whisper_model_size": "small.en",
   "whisper_model_path": "models/small.en",
   "whisper_compute_type": "int8",
-
   "window_width": 900,
   "window_height": 650
 }
