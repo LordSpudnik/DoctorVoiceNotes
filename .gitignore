@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# Logs - may contain diagnostic detail, keep out of version control
+logs/*.log
+logs/*.log.*
+
+# Patient notes contain PHI (Protected Health Information).
+# These must NEVER be committed to git, synced to GitHub, or otherwise
+# leave the local machine.
+notes/*.docx
+
+# Speech model binaries - too large for git, and downloaded separately
+# (see models/small.en/README_DOWNLOAD_MODEL.txt)
+models/**/*.bin
+models/**/*.json
+models/**/*.txt
+!models/small.en/README_DOWNLOAD_MODEL.txt
+
+# Local settings (keep the template in config/, but ignore any doctor-
+# specific overrides if you choose to rename them locally)
+*.broken-*
+
+# PyInstaller build artifacts (Phase 7)
+build/
+dist/
+*.spec.bak

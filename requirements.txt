@@ -1,0 +1,51 @@
+# ============================================================================
+# Doctor Voice Notes - Python dependencies
+# ============================================================================
+# Target: Python 3.12, Windows 10/11, 64-bit  (PRD Section 9)
+#
+# Install with:
+#   python -m venv venv
+#   venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# NOTE ON VERSIONS:
+# The versions below are pinned so the build is reproducible. They were
+# current and known-compatible with each other at the time this file was
+# written. Before you build the final installer, run:
+#   pip list --outdated
+# and re-test after any upgrade, especially ctranslate2 <-> faster-whisper,
+# since those two must be compatible with each other.
+# ============================================================================
+
+# --- Speech recognition (offline) ------------------------------------------
+faster-whisper==1.0.3
+# faster-whisper depends on ctranslate2 as its inference engine.
+# Pinned explicitly here so pip does not silently pull an incompatible major
+# version in the future.
+ctranslate2==4.4.0
+
+# --- Audio capture from the microphone -------------------------------------
+sounddevice==0.4.7
+# sounddevice needs numpy to hand back audio as arrays.
+numpy==1.26.4
+
+# --- Voice activity detection (used to decide when a phrase has ended) ----
+# This is NOT in the PRD's dependency list, but it is required to make
+# "real-time" transcription behave sensibly (see Phase 3 notes). Without it,
+# we would have to guess fixed-length chunks, which cuts words in half.
+webrtcvad==2.0.10
+
+# --- Word document generation ----------------------------------------------
+python-docx==1.1.2
+
+# --- Packaging into a single Windows .exe ----------------------------------
+pyinstaller==6.10.0
+
+# ============================================================================
+# Deliberately EXCLUDED (per PRD Section 4 - Scope - Excluded):
+#   - any HTTP client / cloud SDK
+#   - any authentication library
+#   - any database driver
+# If you ever see one of these creep into requirements.txt, that is a sign
+# scope is drifting away from the "fully offline, single user" design.
+# ============================================================================
