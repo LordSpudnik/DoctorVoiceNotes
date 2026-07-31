@@ -7,8 +7,8 @@ src.transcription.engine.TranscriptionEngine) into structured document
 content, per PRD FR-08 (Voice Commands).
 
 Supported commands (spoken anywhere within a phrase, case-insensitive):
-    "new paragraph"         -> inserts a blank line
-    "full stop"             -> inserts "." and closes the current sentence
+    "new paragraph"         -> moves to the next line without leaving a blank line gap
+    "full stop"             -> inserts "." without starting a new line
     "comma"                 -> inserts ","
     "new patient"           -> inserts a "Patient / <date> / <time>" block
     "save note"             -> requests an immediate out-of-cycle save
@@ -143,10 +143,10 @@ _COLLAPSE_WHITESPACE = re.compile(r"\s+")
 
 class _SegType(Enum):
     TEXT = auto()             # a chunk of plain dictation words
-    FULL_STOP = auto()        # closes the current sentence with "."
+    FULL_STOP = auto()        # closes the current sentence with "." (same line)
     COMMA = auto()            # inserts "," (does NOT close a sentence)
-    PARAGRAPH_BREAK = auto()  # closes the paragraph + inserts a blank line
-    PATIENT_HEADER = auto()   # closes the paragraph + inserts header block
+    PARAGRAPH_BREAK = auto()  # moves to the next line without an empty gap
+    PATIENT_HEADER = auto()   # closes the line + inserts header block
 
 # Boundary types that both close a sentence AND count as a valid deletion
 # target for "delete last sentence". COMMA is intentionally excluded - a
@@ -183,11 +183,12 @@ def _capitalize_first(text: str) -> str:
 def render_segments(segments: list[_Segment]) -> str:
     """
     Turns a list of segments into plain text: one paragraph per line,
-    joined with "\n". Blank lines from "new paragraph" / "new patient"
-    are represented as empty-string paragraphs, so joining with a single
-    "\n" (not "\n\n") already produces the correct visual blank line.
-    This function is intentionally pure (no side effects, no dependency
-    on processor state) so it is trivial to unit test on its own.
+    joined with "\n". 
+    
+    MODIFIED: 
+      - FULL_STOP appends "." to the current line and does not trigger close_paragraph().
+      - PARAGRAPH_BREAK closes the current line and starts on the very next line without
+        inserting an extra blank line gap.
     """
     paragraphs: list[str] = []
     current = ""
@@ -195,10 +196,6 @@ def render_segments(segments: list[_Segment]) -> str:
     def close_paragraph():
         nonlocal current
         # Only emit the paragraph being closed if it actually has content.
-        # Without this guard, closing an already-empty "current" (e.g. two
-        # boundary commands back-to-back, or a boundary as the very first
-        # thing in the document) would insert a spurious extra blank line
-        # on top of the one the boundary itself is about to add below.
         if current:
             paragraphs.append(current)
         current = ""
@@ -207,20 +204,14 @@ def render_segments(segments: list[_Segment]) -> str:
         if seg.type == _SegType.TEXT:
             current = f"{current} {seg.text}" if current else seg.text
         elif seg.type == _SegType.FULL_STOP:
+            # Append "." without closing the paragraph so text continues on the same line
             current += "."
-            # PRD Section 11's worked example shows every completed
-            # sentence on its own line (not run together in one block),
-            # so "full stop" ends the current line, not just the sentence.
-            # "new paragraph" (below) is reserved for an ADDITIONAL blank
-            # line on top of that, for grouping several sentences into a
-            # visually distinct block - matching how the two commands are
-            # described as separate things in FR-08.
-            close_paragraph()
         elif seg.type == _SegType.COMMA:
             current += ","
         elif seg.type == _SegType.PARAGRAPH_BREAK:
+            # Only close the current line so the next text starts on the immediate next line
+            # Do NOT append an empty string (""), which would create an extra blank line gap.
             close_paragraph()
-            paragraphs.append("")  # the blank line itself
         elif seg.type == _SegType.PATIENT_HEADER:
             close_paragraph()
             paragraphs.append("")
@@ -312,6 +303,7 @@ class VoiceCommandProcessor:
 
         elif command_type == CommandType.FULL_STOP:
             self._segments.append(_Segment(type=_SegType.FULL_STOP))
+            # Keep at_sentence_start = True so the next word on the same line is capitalized
             self._at_sentence_start = True
             logger.info("Voice command: full stop")
 
@@ -321,14 +313,6 @@ class VoiceCommandProcessor:
 
         elif command_type == CommandType.NEW_PATIENT:
             now = self._clock()
-            # Format matches the date/time style shown in PRD Section 11's
-            # worked example ("29 July 2026" / "10:45 AM"). FR-08's literal
-            # text is just the words "Patient / Date / Time" as a template
-            # label - ASSUMPTION: these mean the literal word "Patient"
-            # followed by the actual current date and time values (matching
-            # Section 11's pattern), not the literal words "Date"/"Time".
-            # Flagging this explicitly since the PRD is genuinely ambiguous
-            # here.
             date_str = now.strftime("%d %B %Y")
             time_str = now.strftime("%I:%M %p")
             self._segments.append(
