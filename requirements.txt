@@ -41,6 +41,8 @@ python-docx==1.1.2
 # --- Packaging into a single Windows .exe ----------------------------------
 pyinstaller==6.10.0
 
+customtkinter==6.0.0
+
 # ============================================================================
 # Deliberately EXCLUDED (per PRD Section 4 - Scope - Excluded):
 #   - any HTTP client / cloud SDK

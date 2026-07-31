@@ -3,7 +3,7 @@
   "default_document_name": "PatientNotes.docx",
   "selected_microphone": null,
   "autosave_interval_seconds": 5,
-  "theme": "light",
+  "theme": "dark",
   "large_text_mode": false,
   "font_size": 18,
   "voice_commands_enabled": true,
