@@ -58,29 +58,30 @@ line, if there is an open paragraph to extend, is appended to it via
 add_run() instead of starting a new paragraph. Every other line starts a
 fresh paragraph. See _write_pending_text() for the exact algorithm.
 
-ASSUMPTIONS FLAGGED IN THIS PHASE (not confirmed by user - see chat reply)
+PHASE 6 UPDATE - BOTH FLAGGED ASSUMPTIONS RESOLVED BY USER
 ------------------------------------------------------------------------
-1. PRD Section 11 shows a Date/Time header ("29 July 2026" / "10:45 AM")
-   at the top of the document, directly followed by note content - no
-   literal word "Patient" (that literal word is specific to the "new
-   patient" VOICE COMMAND from Phase 4, a different mechanism). This
-   writer assumes that header is written once per RECORDING SESSION
-   (i.e. once per Start button press - start_session()), not once ever
-   per document file. The PRD does not say which, and it matters: if the
-   doctor Starts/Stops multiple times against the same PatientNotes.docx
-   in one day, this assumption produces a repeated Date/Time block each
-   time. Flagging this explicitly; easy to change to "only on first-ever
-   document creation" if that is not what is wanted.
-2. If start_session() opens an EXISTING .docx (FR-06: "append if the
-   document already exists"), self._pending_paragraph always starts as
-   None for that session - i.e. new dictation is never spliced onto
-   whatever paragraph was last in the file, even if that file's last
-   session ended mid-sentence (e.g. a crash, or force-quit, before a
-   proper Stop). This is the conservative choice: silently re-opening
-   and appending onto a stale paragraph from a possibly-earlier patient
-   or a possibly-already-read note is a worse failure mode than leaving
-   one incomplete-looking line in the document. Flagging as a known
-   limitation, not solved further here.
+The two open assumptions below were flagged at the end of Phase 5 and
+have now been explicitly decided by the user before Phase 6 UI wiring:
+
+1. Session header (Date/Time): decided ONCE PER DOCUMENT, not once per
+   Start press. start_session() now writes the header only when a
+   document is being created fresh (brand new file, or an existing file
+   that was unreadable and is being replaced) - never when successfully
+   opening a valid existing document to append to. See
+   document_is_new in start_session() below. Reasoning (user
+   discussion): the PRD's own "new patient" voice command already exists
+   as the semantically meaningful way to mark a new dated entry
+   mid-document; repeating the session header on every Start/Stop would
+   inject a technical-pause timestamp that has no clinical meaning and
+   clutters the note.
+2. Stale-paragraph-on-reopen: decided KEEP CONSERVATIVE (confirmed, no
+   code change needed - this was already the Phase 5 behaviour). New
+   dictation is never spliced onto whatever paragraph was last in the
+   file, even if that file's last session ended mid-sentence (e.g. a
+   crash, or force-quit, before a proper Stop). Silently re-opening and
+   appending onto a stale paragraph from a possibly-earlier patient or a
+   possibly-already-read note is a worse failure mode than leaving one
+   incomplete-looking line in the document.
 3. No additional docx styling (fonts, bold headers, colours) is applied
    beyond plain paragraphs - the PRD's "neatly formatted" secondary
    objective is read as "one sentence per line, blank lines around
@@ -178,15 +179,18 @@ class DocumentWriter:
         Call when the doctor presses Start (FR-02). Resolves the save
         path from current settings, opens the existing document or
         creates a new one (FR-06), writes this session's Date/Time header
-        (Section 11), and saves immediately so the file exists on disk
-        from the first moment of recording (not only once the first
-        autosave tick fires).
+        (Section 11) ONLY if the document is new (Phase 6 decision), and
+        saves immediately so the file exists on disk from the first
+        moment of recording (not only once the first autosave tick
+        fires).
         """
         self._doc_path = self._resolve_document_path()
+        document_is_new = True
 
         if self._doc_path.exists():
             try:
                 self._doc = Document(str(self._doc_path))
+                document_is_new = False
                 logger.info(f"Opened existing document for appending: {self._doc_path}")
             except Exception as e:
                 # Mirrors ConfigManager's corrupted-settings.json handling
@@ -202,16 +206,27 @@ class DocumentWriter:
                 )
                 self._backup_unreadable_document()
                 self._doc = Document()
+                # document_is_new stays True: the unreadable file is being
+                # replaced, so this is effectively a new document and gets
+                # its own header - see module docstring, Phase 6 point 1.
         else:
             self._doc = Document()
             logger.info(f"Creating new document: {self._doc_path}")
 
         # A fresh session never inherits an "open" paragraph from
-        # whatever was last in the file - see module docstring,
-        # assumption 2.
+        # whatever was last in the file - see module docstring, point 2
+        # (stale-paragraph-on-reopen, kept conservative).
         self._pending_paragraph = None
 
-        self._write_session_header()
+        if document_is_new:
+            self._write_session_header()
+        else:
+            logger.info(
+                "Session header skipped: document already exists "
+                "(header is written once per document, not once per "
+                "Start press - see module docstring, Phase 6 point 1)."
+            )
+
         if not self._save_to_disk():
             logger.error(
                 f"Could not write the initial document to {self._doc_path} "
@@ -268,7 +283,7 @@ class DocumentWriter:
         )
         return False
 
-    def stop_session(self) -> None:
+    def stop_session(self) -> bool:
         """
         Call when the doctor presses Stop (FR-07): completes
         transcription is assumed to already have happened upstream
@@ -276,33 +291,44 @@ class DocumentWriter:
         pushes a final sentinel); this method's job is to make sure
         whatever text that produced gets written and saved before the
         app reports Idle.
+
+        PHASE 6 CHANGE: now returns bool (previously returned None).
+        True means the final on-disk state is confirmed good (either the
+        pending text was saved successfully, or there was nothing pending
+        and the defensive re-save succeeded). False means FR-07's "Word
+        document is saved" promise was NOT met - dictated text exists
+        only in memory and the doctor must be warned before the UI
+        reports Idle. This method still cannot show UI itself (no
+        Tkinter dependency in this module, by design); the caller
+        (main_window.py) is responsible for checking the return value
+        and surfacing a warning dialog.
         """
         if self._doc is None:
             logger.warning("stop_session() called before start_session(); nothing to do.")
-            return
+            return True
 
         if self._processor.has_pending_text():
             success = self.autosave()
             if not success:
                 # This is worse than a mid-session autosave miss: FR-07
                 # promises "Word document is saved" as part of Stop
-                # completing. Phase 6/7's UI must surface this to the
-                # doctor rather than silently reporting Idle - flagging
-                # as a cross-phase dependency, not solved here.
+                # completing.
                 logger.error(
                     "FR-07 final save on Stop FAILED after retries. "
                     "Dictated text exists only in memory. The UI layer "
                     "must warn the doctor rather than silently return to "
                     "Idle."
                 )
+            logger.info("Recording session stopped; final save attempted.")
+            return success
         else:
             # Nothing new, but make sure the file on disk reflects the
             # in-memory document (should already be in sync from the
             # last successful autosave tick - this is a defensive no-op
             # in the common case).
-            self._save_to_disk()
-
-        logger.info("Recording session stopped; final save attempted.")
+            success = self._save_to_disk()
+            logger.info("Recording session stopped; final save attempted.")
+            return success
 
     # ------------------------------------------------------------------
     # AUTOSAVE LOOP
@@ -360,8 +386,8 @@ class DocumentWriter:
     def _write_session_header(self) -> None:
         """
         Writes the Date/Time header shown at the top of PRD Section 11's
-        worked example. See module docstring, assumption 1, for why this
-        runs once per session rather than once per document.
+        worked example. Phase 6: only called when start_session()
+        determines the document is new - see module docstring, point 1.
         """
         now = self._clock()
         date_str = now.strftime("%d %B %Y")
