@@ -1,30 +1,7 @@
 """
 settings_dialog.py
 ===================
-
-Settings dialog for Doctor Voice Notes (PRD FR-09).
-
-Restyled onto CustomTkinter to match the rest of the Phase 6 UI. Every
-control here still maps directly onto a real key in
-config_manager.DEFAULT_SETTINGS - nothing invents a new setting the rest
-of the app does not read (same rule as the previous draft).
-
-WHAT CHANGED FROM THE PREVIOUS DRAFT
--------------------------------------
-- Visual restyle only (CTk widgets, rounded corners, consistent palette).
-- The Save button is now clearly labeled "Save Settings" and is the
-  filled/primary button, with "Cancel" as a plain outlined button next to
-  it, so the confirm action is unambiguous (this was the doctor's actual
-  complaint about the old dialog - not a missing feature, a missing
-  visual affordance).
-- Theme is now a two-option segmented control instead of radio buttons -
-  same underlying "theme": "light"/"dark" setting, just a more modern
-  control that is easier to hit with a mouse for a doctor with limited
-  computer experience (Section 16, Accessibility: large buttons).
-
-Settings are only applied on the NEXT "Start" press, not to a session
-that is already running - unchanged from the previous draft. main_window.py
-enforces this by disabling the Settings button while recording.
+Visually enhanced setting dialog matching the new upgraded modern aesthetic.
 """
 
 from tkinter import filedialog, messagebox
@@ -36,6 +13,11 @@ from src.audio.recorder import list_input_devices
 from src.utils.config_manager import ConfigManager
 
 _FONT_FAMILY = "Segoe UI"
+_PRIMARY = ("#4F46E5", "#6366F1")
+_BG = ("#F9FAFB", "#0F0F1A")
+_TEXT = ("#111827", "#F9FAFB")
+_CARD = ("#FFFFFF", "#1E1E2E")
+_BORDER = ("#E5E7EB", "#313244")
 
 
 class SettingsDialog(ctk.CTkToplevel):
@@ -45,96 +27,122 @@ class SettingsDialog(ctk.CTkToplevel):
         self.on_saved = on_saved
 
         self.title("Settings")
-        self.geometry("540x600")
-        self.resizable(False, False)
+        self.geometry("640x760")         # Increased height to 820
+        self.resizable(False, True)      # Allows vertical resizing if needed
+        self.configure(fg_color=_BG)
         self.transient(parent)
-        self.grab_set()  # modal
+        self.grab_set()  
 
         self._mics = list_input_devices()
         self._build_widgets()
         self._load_current_values()
 
-    # ------------------------------------------------------------------
     def _build_widgets(self) -> None:
-        pad = {"padx": 24, "pady": (0, 18)}
+        pad = {"padx": 40, "pady": (0, 25)}
 
-        ctk.CTkLabel(self, text="Settings", font=(_FONT_FAMILY, 22, "bold")).pack(
-            anchor="w", padx=24, pady=(24, 16)
-        )
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", padx=40, pady=(40, 30))
+        
+        ctk.CTkLabel(
+            header_frame, text="⚙️ Preferences", 
+            font=(_FONT_FAMILY, 28, "bold"), text_color=_PRIMARY
+        ).pack(side="left")
 
-        # --- Microphone (FR-09) ---
-        mic_frame = ctk.CTkFrame(self, fg_color="transparent")
-        mic_frame.pack(fill="x", **pad)
-        ctk.CTkLabel(mic_frame, text="Microphone", font=(_FONT_FAMILY, 13, "bold")).pack(anchor="w")
+        # Container for main settings to give a card-like look
+        main_card = ctk.CTkFrame(self, fg_color=_CARD, corner_radius=16, border_width=1, border_color=_BORDER)
+        main_card.pack(fill="both", expand=True, padx=40, pady=(0, 20))
+
+        # We will pad inside the card
+        inner_pad = {"padx": 30, "pady": (20, 0)}
+
+        # --- Microphone ---
+        mic_frame = ctk.CTkFrame(main_card, fg_color="transparent")
+        mic_frame.pack(fill="x", **inner_pad)
+        ctk.CTkLabel(mic_frame, text="Microphone Device", font=(_FONT_FAMILY, 14, "bold")).pack(anchor="w")
         mic_row = ctk.CTkFrame(mic_frame, fg_color="transparent")
-        mic_row.pack(fill="x", pady=(6, 0))
+        mic_row.pack(fill="x", pady=(8, 0))
         self.mic_var = ctk.StringVar()
         mic_names = ["System default"] + [m.name for m in self._mics]
-        self.mic_menu = ctk.CTkOptionMenu(mic_row, values=mic_names, variable=self.mic_var, width=320)
+        self.mic_menu = ctk.CTkOptionMenu(
+            mic_row, values=mic_names, variable=self.mic_var, 
+            width=350, height=40, corner_radius=8, font=(_FONT_FAMILY, 14)
+        )
         self.mic_menu.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(mic_row, text="Refresh", width=90, command=self._refresh_mics).pack(
-            side="left", padx=(8, 0)
-        )
+        ctk.CTkButton(
+            mic_row, text="🔄 Refresh", width=100, height=40, corner_radius=8,
+            font=(_FONT_FAMILY, 13, "bold"), fg_color=_PRIMARY, command=self._refresh_mics
+        ).pack(side="left", padx=(10, 0))
 
-        # --- Autosave interval (FR-09, FR-05) ---
-        interval_frame = ctk.CTkFrame(self, fg_color="transparent")
-        interval_frame.pack(fill="x", **pad)
-        ctk.CTkLabel(interval_frame, text="Autosave interval (seconds)",
-                     font=(_FONT_FAMILY, 13, "bold")).pack(anchor="w")
+        # --- Autosave interval ---
+        interval_frame = ctk.CTkFrame(main_card, fg_color="transparent")
+        interval_frame.pack(fill="x", **inner_pad)
+        ctk.CTkLabel(interval_frame, text="Autosave Interval (seconds)", font=(_FONT_FAMILY, 14, "bold")).pack(anchor="w")
         self.interval_var = ctk.StringVar()
-        ctk.CTkEntry(interval_frame, textvariable=self.interval_var, width=100).pack(
-            anchor="w", pady=(6, 0)
-        )
+        ctk.CTkEntry(
+            interval_frame, textvariable=self.interval_var, width=120, height=40, 
+            corner_radius=8, font=(_FONT_FAMILY, 14)
+        ).pack(anchor="w", pady=(8, 0))
 
-        # --- Save folder (FR-09, FR-06) ---
-        folder_frame = ctk.CTkFrame(self, fg_color="transparent")
-        folder_frame.pack(fill="x", **pad)
-        ctk.CTkLabel(folder_frame, text="Save folder", font=(_FONT_FAMILY, 13, "bold")).pack(anchor="w")
+        # --- Save folder ---
+        folder_frame = ctk.CTkFrame(main_card, fg_color="transparent")
+        folder_frame.pack(fill="x", **inner_pad)
+        ctk.CTkLabel(folder_frame, text="Output Folder", font=(_FONT_FAMILY, 14, "bold")).pack(anchor="w")
         folder_row = ctk.CTkFrame(folder_frame, fg_color="transparent")
-        folder_row.pack(fill="x", pady=(6, 0))
+        folder_row.pack(fill="x", pady=(8, 0))
         self.folder_var = ctk.StringVar()
-        ctk.CTkEntry(folder_row, textvariable=self.folder_var).pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(folder_row, text="Browse...", width=90, command=self._browse_folder).pack(
-            side="left", padx=(8, 0)
-        )
+        ctk.CTkEntry(
+            folder_row, textvariable=self.folder_var, height=40, 
+            corner_radius=8, font=(_FONT_FAMILY, 14)
+        ).pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(
+            folder_row, text="📂 Browse", width=100, height=40, corner_radius=8,
+            font=(_FONT_FAMILY, 13, "bold"), fg_color=_PRIMARY, command=self._browse_folder
+        ).pack(side="left", padx=(10, 0))
 
-        # --- Document name (FR-09, FR-06) ---
-        doc_frame = ctk.CTkFrame(self, fg_color="transparent")
-        doc_frame.pack(fill="x", **pad)
-        ctk.CTkLabel(doc_frame, text="Document name", font=(_FONT_FAMILY, 13, "bold")).pack(anchor="w")
+        # --- Document name ---
+        doc_frame = ctk.CTkFrame(main_card, fg_color="transparent")
+        doc_frame.pack(fill="x", **inner_pad)
+        ctk.CTkLabel(doc_frame, text="Target Document Name", font=(_FONT_FAMILY, 14, "bold")).pack(anchor="w")
         self.doc_var = ctk.StringVar()
-        ctk.CTkEntry(doc_frame, textvariable=self.doc_var).pack(fill="x", pady=(6, 0))
+        ctk.CTkEntry(
+            doc_frame, textvariable=self.doc_var, height=40, 
+            corner_radius=8, font=(_FONT_FAMILY, 14)
+        ).pack(fill="x", pady=(8, 0))
 
-        # --- Large text mode (FR-09, Accessibility) ---
-        self.large_text_var = ctk.BooleanVar()
-        ctk.CTkCheckBox(
-            self, text="Large text mode", variable=self.large_text_var, font=(_FONT_FAMILY, 13),
-        ).pack(anchor="w", padx=24, pady=(0, 18))
-
-        # --- Theme (FR-09: dark mode) ---
-        theme_frame = ctk.CTkFrame(self, fg_color="transparent")
-        theme_frame.pack(fill="x", **pad)
-        ctk.CTkLabel(theme_frame, text="Theme", font=(_FONT_FAMILY, 13, "bold")).pack(anchor="w")
+        # --- Theme ---
+        theme_frame = ctk.CTkFrame(main_card, fg_color="transparent")
+        theme_frame.pack(fill="x", **inner_pad)
+        ctk.CTkLabel(theme_frame, text="Appearance", font=(_FONT_FAMILY, 14, "bold")).pack(anchor="w")
         self.theme_var = ctk.StringVar()
         self.theme_switch = ctk.CTkSegmentedButton(
-            theme_frame, values=["Light", "Dark"], variable=self.theme_var,
+            theme_frame, values=["Light", "Dark"], variable=self.theme_var, 
+            height=40, font=(_FONT_FAMILY, 13, "bold"), corner_radius=8
         )
-        self.theme_switch.pack(anchor="w", pady=(6, 0))
+        self.theme_switch.pack(anchor="w", pady=(8, 0))
+
+        # --- Large text mode ---
+        self.large_text_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            main_card, text="Enable Large Text Mode (Accessibility)", variable=self.large_text_var, 
+            font=(_FONT_FAMILY, 14, "bold"), checkbox_width=24, checkbox_height=24, 
+            corner_radius=6, text_color=_TEXT
+        ).pack(anchor="w", padx=30, pady=(20, 25))
 
         # --- buttons ---
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=24, pady=(10, 24), side="bottom")
+        btn_row.pack(fill="x", padx=40, pady=(0, 30), side="bottom")
+        
         ctk.CTkButton(
-            btn_row, text="Save Settings", height=44, corner_radius=22,
-            font=(_FONT_FAMILY, 14, "bold"), command=self._on_save,
+            btn_row, text="💾 Save Preferences", height=50, corner_radius=12,
+            font=(_FONT_FAMILY, 16, "bold"), fg_color=_PRIMARY, command=self._on_save,
         ).pack(side="right")
+        
         ctk.CTkButton(
-            btn_row, text="Cancel", height=44, corner_radius=22, width=110,
-            font=(_FONT_FAMILY, 14), fg_color="transparent", border_width=2,
-            command=self.destroy,
-        ).pack(side="right", padx=(0, 10))
+            btn_row, text="Cancel", height=50, corner_radius=12, width=120,
+            font=(_FONT_FAMILY, 16, "bold"), fg_color="transparent", border_width=2,
+            text_color=_TEXT, hover_color=_BORDER, command=self.destroy,
+        ).pack(side="right", padx=(0, 15))
 
-    # ------------------------------------------------------------------
     def _refresh_mics(self) -> None:
         self._mics = list_input_devices()
         mic_names = ["System default"] + [m.name for m in self._mics]
@@ -147,7 +155,6 @@ class SettingsDialog(ctk.CTkToplevel):
         if chosen:
             self.folder_var.set(chosen)
 
-    # ------------------------------------------------------------------
     def _load_current_values(self) -> None:
         selected_index = self.config.get("selected_microphone")
         mic_name = "System default"
@@ -165,7 +172,6 @@ class SettingsDialog(ctk.CTkToplevel):
         self.theme_var.set("Dark" if self.config.get("theme") == "dark" else "Light")
 
     def _on_save(self) -> None:
-        # --- validation (Section 14: prevent crash, catch bad input) ---
         doc_name = self.doc_var.get().strip()
         if not doc_name:
             messagebox.showerror("Settings", "Document name cannot be empty.")

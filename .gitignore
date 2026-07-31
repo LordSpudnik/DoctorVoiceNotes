@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .vscode/
+venv/
 
 # Logs - may contain diagnostic detail, keep out of version control
 logs/*.log
