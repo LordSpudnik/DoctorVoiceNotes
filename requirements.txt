@@ -33,7 +33,7 @@ numpy==1.26.4
 # This is NOT in the PRD's dependency list, but it is required to make
 # "real-time" transcription behave sensibly (see Phase 3 notes). Without it,
 # we would have to guess fixed-length chunks, which cuts words in half.
-# webrtcvad==2.0.10
+webrtcvad==2.0.10
 
 # --- Word document generation ----------------------------------------------
 python-docx==1.1.2
