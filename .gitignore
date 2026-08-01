@@ -33,6 +33,7 @@ models--Systran--faster-whisper-small.en/
 # PyInstaller build artifacts (Phase 7)
 build/
 dist/
+installer_output/
 *.spec.bak
 
 # Test artifacts

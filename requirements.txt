@@ -24,6 +24,14 @@ faster-whisper==1.0.3
 # version in the future.
 ctranslate2==4.4.0
 
+# faster_whisper/utils.py does "import requests" unconditionally but does
+# NOT declare requests as a dependency in its own package metadata -
+# confirmed by installing faster-whisper alone into an empty venv and
+# watching requests NOT get pulled in. Without this, the app fails at
+# import time with "No module named 'requests'", even though pip install
+# -r requirements.txt reports success with no errors.
+requests==2.32.3
+
 # --- Audio capture from the microphone -------------------------------------
 sounddevice==0.4.7
 # sounddevice needs numpy to hand back audio as arrays.
@@ -35,10 +43,17 @@ numpy==1.26.4
 # we would have to guess fixed-length chunks, which cuts words in half.
 webrtcvad==2.0.10
 
+# webrtcvad.py calls pkg_resources.get_distribution() at import time.
+# setuptools >=81 removed pkg_resources entirely (deprecated, then
+# deleted) - confirmed by reproducing in a clean venv: latest setuptools
+# installs fine, but "import pkg_resources" then fails outright. Pin
+# below that version so pkg_resources still exists to be imported.
+setuptools<81
+
 # --- Word document generation ----------------------------------------------
 python-docx==1.1.2
 
-# --- Packaging into a single Windows .exe ----------------------------------
+# --- Packaging into a Windows executable (see build.spec: onedir mode) -----
 pyinstaller==6.10.0
 
 customtkinter==6.0.0
@@ -48,6 +63,11 @@ customtkinter==6.0.0
 #   - any HTTP client / cloud SDK
 #   - any authentication library
 #   - any database driver
-# If you ever see one of these creep into requirements.txt, that is a sign
-# scope is drifting away from the "fully offline, single user" design.
+# requests above is the one exception - it is a hard runtime dependency of
+# faster-whisper's own code (see note above), not a deliberate addition of
+# networking capability. engine.py never calls anything that uses it
+# (local_files_only=True everywhere), it is only imported.
+# If you ever see a genuinely new HTTP client, auth library, or database
+# driver creep into this file, that is a sign scope is drifting away from
+# the "fully offline, single user" design.
 # ============================================================================
