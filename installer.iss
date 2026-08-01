@@ -68,7 +68,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=installer_output
 OutputBaseFilename=DoctorVoiceNotes_Setup_v{#MyAppVersion}
-Compression=lzma2
+Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=assets\icons\app_icon.ico
@@ -88,12 +88,6 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 ; see build.spec's "WHY ONEDIR, NOT ONEFILE" note for why this is a
 ; folder, not a single portable .exe.
 Source: "dist\DoctorVoiceNotes\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; The speech model (100MB+ for small.en). "skipifsourcedoesntexist"
-; means compiling this script before the model has been downloaded
-; produces a valid installer that simply omits the model - see the
-; "THE MODEL FILES" note above for what happens in that case.
-Source: "models\small.en\*"; DestDir: "{app}\models\small.en"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
