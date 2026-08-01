@@ -34,24 +34,68 @@ Designed specifically for healthcare professionals, the application provides a s
 
 ```
 DoctorVoiceNotes/
+├── main.py # App entry point
+├── build.spec # PyInstaller build spec, onedir mode
+├── build.bat # Windows build script
+├── installer.iss # Inno Setup installer script
+├── requirements.txt # Pinned dependencies
+├── README.md # Developer setup, build, and known-issues doc
 │
 ├── assets/
-├── config/
-├── logs/
-├── models/
-├── notes/
-├── src/
-│   ├── audio/
-│   ├── commands/
-│   ├── document/
-│   ├── transcription/
-│   ├── ui/
-│   └── utils/
+│ └── icons/
+│ └── app_icon.ico
 │
-├── main.py
-├── requirements.txt
-└── README.md
+├── models/
+│ └── small.en/ # Speech model
+│ ├── model.bin
+│ ├── config.json
+│ ├── tokenizer.json
+│ ├── vocabulary.txt
+│ └── README_DOWNLOAD_MODEL.txt
+│
+├── src/
+│ ├── init.py
+│ ├── audio/
+│ │ ├── init.py
+│ │ └── recorder.py # Microphone detection + capture
+│ ├── transcription/
+│ │ ├── init.py
+│ │ └── engine.py # Whisper transcription + VAD
+│ ├── document/
+│ │ ├── init.py
+│ │ └── writer.py # .docx writing + autosave
+│ ├── commands/
+│ │ ├── init.py
+│ │ └── voice_commands.py # Voice command parsing
+│ ├── ui/
+│ │ ├── init.py
+│ │ ├── main_window.py # Main application window
+│ │ └── settings_dialog.py # Settings dialog
+│ └── utils/
+│ ├── init.py
+│ ├── config_manager.py # settings.json load/save
+│ ├── logger.py # Rotating file logging
+│ └── paths.py # Frozen-vs-source path resolution
+│
+├── config/ # Created automatically on first run
+│ └── settings.json
+├── logs/ # Created automatically on first run
+│ └── app.log
+├── notes/ # Created automatically on first run
+│ └── PatientNotes.docx
+│
+├── venv/ # Local virtual environment (gitignored)
+├── build/ # PyInstaller intermediate output (gitignored)
+├── dist/ # PyInstaller final output (gitignored)
+│ └── DoctorVoiceNotes/
+│ ├── DoctorVoiceNotes.exe
+│ ├── _internal/ # Bundled Python + dependencies
+│ └── models/small.en/ # Model, copied here by build.bat
+└── installer_output/ # Compiled installer (gitignored)
+└── DoctorVoiceNotes_Setup_v1.0.0.exe
 ```
+
+**Not committed to source control** (see `.gitignore`): `venv/`, `build/`, `dist/`, `installer_output/`, `models/small.en/*` (except `README_DOWNLOAD_MODEL.txt`), and the auto-generated `config/`, `logs/`, `notes/` contents — these are either environment-specific, build artifacts, or the doctor's own clinical data.
 
 ## Installation
 
